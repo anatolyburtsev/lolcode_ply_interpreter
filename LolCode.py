@@ -14,6 +14,11 @@ tokens = [
     "VAR",
     "ITZ",
 
+    "IF_START",
+    "IF_YES",
+    "IF_NO",
+    "IF_END",
+
     "PLUS",
     "MINUS",
     "MULTIPLY",
@@ -24,10 +29,31 @@ tokens = [
     "MIN",
 
     "CHANGE_TYPE",
+    "NEWLINE",
 
     "PRINT",
     "INPUT"
 ]
+
+
+def t_IF_START(t):
+    r'O\ RLY\?'
+    return t
+
+
+def t_IF_YES(t):
+    r'YA\ RLY'
+    return t
+
+
+def t_IF_NO(t):
+    r'NO\ WAI'
+    return t
+
+
+def t_IF_END(t):
+    r'OIC'
+    return t
 
 
 def t_PLUS(t):
@@ -98,34 +124,37 @@ def t_AN(t):
 
 def t_YARN(t):
     r'\".*\"'
-    t.type = "YARN"
+    # t.type = "YARN"
     t.value = str(t.value[1:-1])
     return t
 
 
 def t_NUMBAR(t):
     r'[+-]?[0-9]+[.][0-9]*'
-    t.type = "NUMBAR"
+    # t.type = "NUMBAR"
     t.value = float(t.value)
     return t
 
 
 def t_NUMBR(t):
     r'\d+'
-    t.type = "NUMBR"
+    # t.type = "NUMBR"
     t.value = int(t.value)
     return t
 
 
 def t_TROOF(t):
     r'WIN|FAIL'
-    t.type = "TROOF"
-    t.value = True if t.value == "WIN" else False
+    # t.type = "TROOF"
+    if t.value == "WIN":
+        t.value = True
+    else:
+        t.value = False
     return t
 
 
 def t_NEWLINE(t):
-    r'\n'
+    r'\n+'
     t.lexer.lineno += 1
     return t
 
@@ -157,14 +186,15 @@ def t_error(t):
     t.lexer.skip(1)
 
 
-t_ignore = r' '
+t_ignore = ' \t\n'
 
 lexer = lex.lex()
 
 precedence = (
     ('left', "PLUS", "MINUS"),
     ("left", "EQUALS"),
-    ("left", "NAME", "VAR")
+    ('left', "IF_END"),
+    ("left", "NAME", "VAR"),
 )
 
 
@@ -175,6 +205,7 @@ def p_calc(p):
          | empty
     '''
     out = run(p[1])
+
     if out:
         print(out)
 
@@ -200,13 +231,54 @@ def p_ver_assign_empty(p):
     p[0] = ("init_empty", p[2])
 
 
-def p_expression_NUMBR(p):
+def p_expression_TYPE(p):
     '''
     expression : NUMBR
                 | NUMBAR
                 | YARN
+                | TROOF
     '''
     p[0] = p[1]
+
+
+class IF:
+    expression = None
+    if_yes = None
+    if_no = None
+
+
+if_list = list()
+
+
+def p_parse_if_start(p):
+    '''
+    empty : expression IF_START
+    '''
+    if_ = IF()
+    if_.expression = p[1]
+    if_list.append(if_)
+
+
+def p_parse_if_yes(p):
+    '''
+    empty : IF_YES expression
+    '''
+    if_list[-1].if_yes = p[2]
+
+
+def p_parse_if_no(p):
+    '''
+    empty : IF_NO expression
+    '''
+    if_list[-1].if_no = p[2]
+
+
+def p_parse_if_end(p):
+    '''
+    expression : IF_END
+    '''
+    if_ = if_list.pop()
+    p[0] = ("if", if_.expression, if_.if_yes, if_.if_no)
 
 
 def p_expression_uno_operation(p):
@@ -237,7 +309,7 @@ def p_expression_type_change(p):
     p[0] = ('cast', p[1], p[3])
 
 
-def p_experssion_var(p):
+def p_expression_var(p):
     '''
     expression : NAME
     '''
@@ -270,6 +342,7 @@ variables = {}
 
 
 def run(p):
+    # print(p)
     if type(p) == tuple:
         if p[0] == "OP":
             v1_raw = p[2]
@@ -311,10 +384,11 @@ def run(p):
         if p[0] == "VISIBLE":
             # print("vis with p = {q}".format(q=p))
             # print(variables)
-            if p[1][0] == "var":
+            if type(p[1]) == tuple and p[1][0] == "var":
                 var_name = p[1][1]
                 if var_name not in variables:
-                    raise Exception("Undeclared variable found! {v}".format(v=var_name))
+                    raise Exception(
+                        "Undeclared variable found! {v}".format(v=var_name))
                 else:
                     print(variables[var_name])
             else:
@@ -336,6 +410,13 @@ def run(p):
             # doesn't work!
             variables[p[1]] = input()
 
+        if p[0] == "if":
+            print(p)
+            if p[1]:
+                return run(p[2])
+            else:
+                return run(p[3])
+
     else:
         return p
 
@@ -349,7 +430,6 @@ GIMMEG VAR2
 BTW VAR2 R "WOW"
 VISIBLE VAR2
 """
-
 prg = """
 VISIBLE PRODUKT OF 2 AN 2
 VISIBLE "10"
@@ -365,7 +445,11 @@ VISIBLE VAR
 VISIBLE VAR2
 """
 
-lex_check("VAR2 R PRODUKT OF VAR AN 2")
+prg = """WIN  O RLY?
+    YA RLY VISIBLE "J00 HAV A CAT"
+    NO WAI VISIBLE "J00 SUX"
+OIC"""
+# lex_check(prg)
 for line in prg.split("\n"):
     if line:
         try:
