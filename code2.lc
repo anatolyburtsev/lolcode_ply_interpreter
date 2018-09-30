@@ -1,0 +1,9 @@
+BTW sum variables as string, type casting and sum variables as numbers
+I HAS A VAR
+VISIBLE "VAR = '10'"
+VAR R "10"
+VISIBLE "sum VAR and VAR as strings"
+VISIBLE SUM OF VAR AN VAR
+VAR IS NOW A NUMBR
+VISIBLE "sum VAR and VAR as numbers"
+VISIBLE SUM OF VAR AN VAR

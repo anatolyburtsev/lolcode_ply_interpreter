@@ -1,5 +1,6 @@
 from ply import yacc
 from ply import lex
+import argparse
 
 tokens = [
     "YARN",
@@ -32,8 +33,65 @@ tokens = [
     "NEWLINE",
 
     "PRINT",
-    "INPUT"
+    "INPUT",
+
+    # logic
+    "LOGIC_EQUALS",
+    "LOGIC_DIFFER",
+    "LOGIC_AND",
+    "LOGIC_OR",
+    "LOGIC_XOR",
+
+    "LOGIC_NOT",
+    "LOGIC_ALL",
+    "LOGIC_ANY",
+    "LOGIC_END",
 ]
+
+
+def t_LOGIC_AND(t):
+    r'BOTH\ OF'
+    return t
+
+
+def t_LOGIC_OR(t):
+    r'EITHER\ OF'
+    return t
+
+
+def t_LOGIC_XOR(t):
+    r'WON\ OF'
+    return t
+
+
+def t_LOGIC_NOT(t):
+    r'NOT\ OF'
+    return t
+
+
+def t_LOGIC_ALL(t):
+    r'ALL\ OF'
+    return t
+
+
+def t_LOGIC_ANY(t):
+    r'ANY\ OF'
+    return t
+
+
+def t_LOGIC_END(t):
+    r'MKAY'
+    return t
+
+
+def t_LOGIC_EQUALS(t):
+    r'BOTH\ SAEM'
+    return t
+
+
+def t_LOGIC_DIFFER(t):
+    r'DIFFRINT'
+    return t
 
 
 def t_IF_START(t):
@@ -92,7 +150,7 @@ def t_MIN(t):
 
 
 def t_EQUALS(t):
-    r'R'
+    r'\bR\b'
     return t
 
 
@@ -102,7 +160,7 @@ def t_PRINT(t):
 
 
 def t_INPUT(t):
-    r'GIMMEG'
+    r'GIMMEH'
     return t
 
 
@@ -117,13 +175,13 @@ def t_ITZ(t):
 
 
 def t_AN(t):
-    r'AN'
+    r'\bAN\b'
     t.type = 'AN'
     return t
 
 
 def t_YARN(t):
-    r'\".*\"'
+    r'\"[^"]*\"'
     # t.type = "YARN"
     t.value = str(t.value[1:-1])
     return t
@@ -210,6 +268,39 @@ def p_calc(p):
         print(out)
 
 
+def p_expression_logic(p):
+    '''
+    expression : LOGIC_EQUALS expression AN expression
+            | LOGIC_DIFFER expression AN expression
+            | LOGIC_AND expression AN expression
+            | LOGIC_OR expression AN expression
+            | LOGIC_XOR expression AN expression
+    '''
+    p[0] = (p[1], p[2], p[4])
+
+
+def p_expression_logic_not(p):
+    '''
+    expression : LOGIC_NOT expression
+    '''
+    p[0] = ("not", p[2])
+
+
+def p_expression_logic_multi(p):
+    '''
+    expression : LOGIC_ALL expression LOGIC_END
+                | LOGIC_ALL expression AN expression LOGIC_END
+                | LOGIC_ALL expression AN expression AN expression LOGIC_END
+                | LOGIC_ALL expression AN expression AN expression AN expression LOGIC_END
+                | LOGIC_ANY expression LOGIC_END
+                | LOGIC_ANY expression AN expression LOGIC_END
+                | LOGIC_ANY expression AN expression AN expression LOGIC_END
+                | LOGIC_ANY expression AN expression AN expression AN expression LOGIC_END
+
+    '''
+    p[0] = (p[1], p[2::2])
+
+
 def p_expression_EQUALS(p):
     '''
     empty : NAME EQUALS expression
@@ -281,12 +372,18 @@ def p_parse_if_end(p):
     p[0] = ("if", if_.expression, if_.if_yes, if_.if_no)
 
 
-def p_expression_uno_operation(p):
+def p_expression_print(p):
     '''
     expression : PRINT expression
-                | INPUT NAME
     '''
-    p[0] = (p[1], p[2])
+    p[0] = ('print', p[2])
+
+
+def p_expression_input(p):
+    '''
+    expression : INPUT NAME
+    '''
+    p[0] = ("input", p[2])
 
 
 def p_expression(p):
@@ -342,19 +439,11 @@ variables = {}
 
 
 def run(p):
-    # print(p)
+    # print(p) #DEBUG
     if type(p) == tuple:
         if p[0] == "OP":
-            v1_raw = p[2]
-            if type(v1_raw) == tuple and v1_raw[0] == 'var':
-                v1 = variables[v1_raw[1]]
-            else:
-                v1 = run(v1_raw)
-            v2_raw = p[3]
-            if type(v2_raw) == tuple and v2_raw[0] == 'var':
-                v2 = variables[v2_raw[1]]
-            else:
-                v2 = run(v2_raw)
+            v1 = run(p[2])
+            v2 = run(p[3])
             operation = p[1]
             if operation == "SUM OF":
                 return v1 + v2
@@ -380,19 +469,18 @@ def run(p):
                 raise Exception("Undeclared variable found! {v}".format(v=p[1]))
             else:
                 variables[p[1]] = run(p[2])
+            return
 
-        if p[0] == "VISIBLE":
+        if p[0] == 'var':
+            if p[1] not in variables:
+                raise Exception("Undeclared variable found! {v}".format(v=p[1]))
+            else:
+                return variables[p[1]]
+        if p[0] == "print":
             # print("vis with p = {q}".format(q=p))
             # print(variables)
-            if type(p[1]) == tuple and p[1][0] == "var":
-                var_name = p[1][1]
-                if var_name not in variables:
-                    raise Exception(
-                        "Undeclared variable found! {v}".format(v=var_name))
-                else:
-                    print(variables[var_name])
-            else:
-                print(run(p[1]))
+            print(run(p[1]))
+            return
         if p[0] == "cast":
             if p[1] not in variables:
                 raise Exception("Undeclared variable found! {v}".format(v=p[1]))
@@ -406,66 +494,63 @@ def run(p):
             else:
                 v = str(v)
             variables[p[1]] = v
-        if p[0] == "GIMMEH":
-            # doesn't work!
-            variables[p[1]] = input()
+            return
+        if p[0] == "BOTH SAEM":
+            return run(p[1]) == run(p[2])
+        if p[0] == "DIFFRINT":
+            return run(p[1]) != run(p[2])
 
         if p[0] == "if":
-            print(p)
-            if p[1]:
+            if run(p[1]):
                 return run(p[2])
             else:
                 return run(p[3])
+
+        if p[0] == "BOTH OF":
+            b1 = run(p[1])
+            b2 = run(p[2])
+            return b1 and b2
+        if p[0] == "EITHER OF":
+            b1 = run(p[1])
+            b2 = run(p[2])
+            return b1 or b2
+        if p[0] == "WON OF":
+            b1 = run(p[1])
+            b2 = run(p[2])
+            return b1 != b2
+        if p[0] == "NOT":
+            b = run(p[1])
+            return not b
+        if p[0] == "ALL OF":
+            for b in p[1]:
+                if not run(b):
+                    return False
+            return True
+        if p[0] == "ANY OF":
+            for b in p[1]:
+                if run(b):
+                    return True
+            return False
+        if p[0] == 'input':
+            variables[p[1]] = raw_input(">>> ")
+            return
 
     else:
         return p
 
 
-prg = """
-I HAS A VAR2
-I HAS A VAR ITZ SUM OF 1 AN 2
-VAR R BIGGR OF 50 AN 10
-VISIBLE VAR
-GIMMEG VAR2
-BTW VAR2 R "WOW"
-VISIBLE VAR2
-"""
-prg = """
-VISIBLE PRODUKT OF 2 AN 2
-VISIBLE "10"
-"""
-
-prg = """
-I HAS A VAR
-I HAS A VAR2
-VAR R "10"
-VAR IS NOW A NUMBR
-VAR2 R PRODUKT OF VAR AN VAR
-VISIBLE VAR
-VISIBLE VAR2
-"""
-
-prg = """WIN  O RLY?
-    YA RLY VISIBLE "J00 HAV A CAT"
-    NO WAI VISIBLE "J00 SUX"
-OIC"""
-# lex_check(prg)
-for line in prg.split("\n"):
-    if line:
-        try:
-            parser.parse(line)
-        except Exception as e:
-            print(line)
-            lex_check(line)
-            raise e
-
-# st1 = "I HAS A VAR ITZ SUM OF 1 AN 2"
-# lex_check(st1)
-# st2 = "VAR R BIGGR OF 50 AN 10"
-# lex_check(st2)
-# st3 = "VISIBLE VAR"
-# lex_check(st3)
-
-# parser.parse(st1)
-# parser.parse(st2)
-# parser.parse(st3)
+if __name__ == "__main__":
+    arg_parser = argparse.ArgumentParser(description='Process some LolCode.')
+    arg_parser.add_argument('-f', nargs=1, help='input filename')
+    args = arg_parser.parse_args()
+    filename = args.f[0]
+    with open(filename, 'r') as f:
+        for line in f:
+            # lex_check(line)
+            if line:
+                try:
+                    parser.parse(line)
+                except Exception as e:
+                    print(line)
+                    lex_check(line)
+                    raise e
