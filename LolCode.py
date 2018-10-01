@@ -303,7 +303,7 @@ def p_expression_logic_multi(p):
 
 def p_expression_EQUALS(p):
     '''
-    empty : NAME EQUALS expression
+    expression : NAME EQUALS expression
     '''
     p[0] = ('=', p[1], p[3])
 
@@ -439,6 +439,7 @@ variables = {}
 
 
 def run(p):
+    # print("run first")
     # print(p) #DEBUG
     if type(p) == tuple:
         if p[0] == "OP":
