@@ -10,7 +10,15 @@ Some programs in LolCode included:
 - code3.lc - simple if else contruction
 - code4.lc - 'guess the animal' game
 
+# REQUIREMENTS:
+```
+python2.7
+PLY
+argparse
+
+```
 # How to run it
+
 ``` sh
 python LolCode.py -f code1.lc
 max of 50 and 10:
